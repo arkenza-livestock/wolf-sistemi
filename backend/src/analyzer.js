@@ -2,16 +2,16 @@ const axios = require('axios');
 const db    = require('./database');
 
 const WOLF_COINS = [
-  'DOGEUSDT','SHIBUSDT','PEPEUSDT','FLOKIUSDT','BONKUSDT',
-  'WIFUSDT','SOLUSDT','AVAXUSDT','ADAUSDT','XRPUSDT',
-  'LINKUSDT','UNIUSDT','AAVEUSDT','SUSHIUSDT','CRVUSDT',
-  'FTMUSDT','ARBUSDT','OPUSDT','GMXUSDT','INJUSDT',
-  'KASUSDT','PYTHUSDT','ONDOUSDT','JUPUSDT','PENGUUSDT',
-  'MANAUSDT','BTCUSDT','ETHUSDT','BNBUSDT','DOTUSDT',
-  'ATOMUSDT','NEARUSDT','APTUSDT','SUIUSDT','SEIUSDT',
-  'TIAUSDT','ALTUSDT','AIUSDT','WLDUSDT','FETUSDT',
-  'AGIXUSDT','RENDERUSDT','GRTUSDT','APEUSDT','SANDUSDT',
-  'AXSUSDT','GALAUSDT','ILVUSDT','RNDRUSDT','TRUUSDT'
+  'BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT',
+  'DOGEUSDT','ADAUSDT','AVAXUSDT','LINKUSDT','DOTUSDT',
+  'UNIUSDT','ATOMUSDT','NEARUSDT','APTUSDT','ARBUSDT',
+  'OPUSDT','INJUSDT','SUIUSDT','SHIBUSDT','PEPEUSDT',
+  'FLOKIUSDT','BONKUSDT','WIFUSDT','FTMUSDT','GMXUSDT',
+  'KASUSDT','PYTHUSDT','JUPUSDT','PENGUUSDT','MANAUSDT',
+  'SANDUSDT','AXSUSDT','GALAUSDT','GRTUSDT','APEUSDT',
+  'FETUSDT','WLDUSDT','SEIUSDT','TIAUSDT','CRVUSDT',
+  'AAVEUSDT','SUSHIUSDT','LTCUSDT','TRXUSDT','MATICUSDT',
+  'LDOUSDT','STXUSDT','RNDRUSDT','TRUUSDT','HBARUSDT'
 ];
 
 class WolfAnalyzer {
@@ -62,14 +62,14 @@ class WolfAnalyzer {
     var emoji       = '';
     var confidence  = 0;
 
-    if      (change1 > 2.5  && change5 > 2   && volSpike) { signal_type='EXTREME_PUMP'; emoji='🚀🚀'; confidence=98; }
-    else if (change1 < -2.5 && change5 < -2  && volSpike) { signal_type='EXTREME_DUMP'; emoji='💥💥'; confidence=98; }
-    else if (change1 > 1.8  && change5 > 1.5 && volSpike) { signal_type='STRONG_PUMP';  emoji='🚀';   confidence=90; }
-    else if (change1 < -1.8 && change5 < -1.5&& volSpike) { signal_type='STRONG_DUMP';  emoji='💥';   confidence=90; }
-    else if (change1 > 1.0  && change5 > 0.8 && volSpike) { signal_type='PUMP';         emoji='📈';   confidence=75; }
-    else if (change1 < -1.0 && change5 < -0.8&& volSpike) { signal_type='DUMP';         emoji='📉';   confidence=75; }
-    else if (change1 > 0.5  && volSpike)                   { signal_type='WEAK_PUMP';    emoji='🟢';   confidence=50; }
-    else if (change1 < -0.5 && volSpike)                   { signal_type='WEAK_DUMP';    emoji='🔴';   confidence=50; }
+    if      (change1 > 2.5  && change5 > 2    && volSpike) { signal_type='EXTREME_PUMP'; emoji='🚀🚀'; confidence=98; }
+    else if (change1 < -2.5 && change5 < -2   && volSpike) { signal_type='EXTREME_DUMP'; emoji='💥💥'; confidence=98; }
+    else if (change1 > 1.8  && change5 > 1.5  && volSpike) { signal_type='STRONG_PUMP';  emoji='🚀';   confidence=90; }
+    else if (change1 < -1.8 && change5 < -1.5 && volSpike) { signal_type='STRONG_DUMP';  emoji='💥';   confidence=90; }
+    else if (change1 > 1.0  && change5 > 0.8  && volSpike) { signal_type='PUMP';         emoji='📈';   confidence=75; }
+    else if (change1 < -1.0 && change5 < -0.8 && volSpike) { signal_type='DUMP';         emoji='📉';   confidence=75; }
+    else if (change1 > 0.5  && volSpike)                    { signal_type='WEAK_PUMP';    emoji='🟢';   confidence=50; }
+    else if (change1 < -0.5 && volSpike)                    { signal_type='WEAK_DUMP';    emoji='🔴';   confidence=50; }
 
     if (signal_type === 'NONE') return null;
 
