@@ -24,6 +24,18 @@ const SIGNAL_BG = {
   WEAK_DUMP:    'rgba(160,174,192,0.05)',
 };
 
+const FILTERS = [
+  { key:'ALL',          label:'Tümü' },
+  { key:'EXTREME_PUMP', label:'Extreme Pump' },
+  { key:'EXTREME_DUMP', label:'Extreme Dump' },
+  { key:'STRONG_PUMP',  label:'Strong Pump' },
+  { key:'STRONG_DUMP',  label:'Strong Dump' },
+  { key:'PUMP',         label:'Pump' },
+  { key:'DUMP',         label:'Dump' },
+  { key:'WEAK_PUMP',    label:'Weak Pump' },
+  { key:'WEAK_DUMP',    label:'Weak Dump' },
+];
+
 export default function Signals({ api }) {
   const [signals,  setSignals]  = useState([]);
   const [filter,   setFilter]   = useState('ALL');
@@ -51,18 +63,6 @@ export default function Signals({ api }) {
     setLoading(false);
   }
 
-  const FILTERS = [
-    { key:'ALL',          label:'Tümü' },
-    { key:'EXTREME_PUMP', label:'🚀🚀 Extreme Pump' },
-    { key:'EXTREME_DUMP', label:'💥💥 Extreme Dump' },
-    { key:'STRONG_PUMP',  label:'🚀 Strong Pump' },
-    { key:'STRONG_DUMP',  label:'💥 Strong Dump' },
-    { key:'PUMP',         label:'📈 Pump' },
-    { key:'DUMP',         label:'📉 Dump' },
-    { key:'WEAK_PUMP',    label:'🟢 Weak Pump' },
-    { key:'WEAK_DUMP',    label:'🔴 Weak Dump' },
-  ];
-
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'calc(100vh - 48px)', gap:16 }}>
 
@@ -71,7 +71,7 @@ export default function Signals({ api }) {
           <div className="page-title">🚨 Sinyaller</div>
           <div className="page-sub">{signals.length} sinyal · Her 15 saniyede güncellenir</div>
         </div>
-        <div style={{ fontSize:11, color:'#4a5568' }}>{loading ? '⏳ Yükleniyor...' : ''}</div>
+        <div style={{ fontSize:11, color:'#4a5568' }}>{loading ? '⏳' : ''}</div>
       </div>
 
       <div style={{ display:'grid', gridTemplateColumns:'280px 1fr', gap:16, flex:1, minHeight:0 }}>
@@ -81,8 +81,8 @@ export default function Signals({ api }) {
           display:'flex', flexDirection:'column', overflow:'hidden' }}>
 
           {/* Filtre */}
-          <div style={{ padding:'10px 12px', borderBottom:'1px solid #1e2736', overflowX:'auto' }}>
-            <div style={{ display:'flex', gap:4', flexWrap:'wrap', gap:4 }}>
+          <div style={{ padding:'10px 12px', borderBottom:'1px solid #1e2736' }}>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
               {FILTERS.map(function(f) {
                 return (
                   <button key={f.key} onClick={function() { setFilter(f.key); }}
@@ -104,15 +104,15 @@ export default function Signals({ api }) {
               <div style={{ textAlign:'center', padding:40, color:'#4a5568', fontSize:12 }}>
                 {loading ? 'Yükleniyor...' : 'Sinyal bulunamadı'}
               </div>
-            ) : signals.map(function(s,i) {
+            ) : signals.map(function(s, i) {
               return (
                 <div key={i} onClick={function() { setSelected(s); }}
                   style={{ padding:'10px 12px', cursor:'pointer',
                     borderBottom:'1px solid #0d1117',
-                    background: selected?.id===s.id
-                      ? (SIGNAL_BG[s.signal_type]||'rgba(246,173,85,0.05)')
+                    background: selected && selected.id===s.id
+                      ? (SIGNAL_BG[s.signal_type] || 'rgba(246,173,85,0.05)')
                       : 'transparent',
-                    borderLeft: selected?.id===s.id ? '3px solid #f6ad55' : '3px solid transparent',
+                    borderLeft: selected && selected.id===s.id ? '3px solid #f6ad55' : '3px solid transparent',
                     transition:'all 0.1s' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                     <div style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -130,12 +130,10 @@ export default function Signals({ api }) {
                     </div>
                   </div>
                   <div style={{ display:'flex', gap:8, marginTop:4 }}>
-                    <span style={{ fontSize:10,
-                      color: parseFloat(s.change1) >= 0 ? '#68d391' : '#fc8181' }}>
+                    <span style={{ fontSize:10, color: parseFloat(s.change1||0) >= 0 ? '#68d391' : '#fc8181' }}>
                       1m: {parseFloat(s.change1||0) >= 0 ? '+' : ''}{s.change1}%
                     </span>
-                    <span style={{ fontSize:10,
-                      color: parseFloat(s.change5) >= 0 ? '#68d391' : '#fc8181' }}>
+                    <span style={{ fontSize:10, color: parseFloat(s.change5||0) >= 0 ? '#68d391' : '#fc8181' }}>
                       5m: {parseFloat(s.change5||0) >= 0 ? '+' : ''}{s.change5}%
                     </span>
                   </div>
@@ -150,7 +148,6 @@ export default function Signals({ api }) {
           overflowY:'auto', padding:'16px 20px' }}>
           {selected ? (
             <div>
-              {/* Başlık */}
               <div style={{ display:'flex', justifyContent:'space-between',
                 alignItems:'center', marginBottom:20 }}>
                 <div>
@@ -162,7 +159,7 @@ export default function Signals({ api }) {
                   </div>
                 </div>
                 <div style={{ textAlign:'right' }}>
-                  <div style={{ fontSize:22, fontWeight:800,
+                  <div style={{ fontSize:18, fontWeight:800,
                     color: SIGNAL_COLORS[selected.signal_type]||'#e2e8f0' }}>
                     {selected.signal_type}
                   </div>
@@ -172,7 +169,6 @@ export default function Signals({ api }) {
                 </div>
               </div>
 
-              {/* Fiyat */}
               <div style={{ background:'#060b14', border:'1px solid #1e2736',
                 borderRadius:8, padding:'14px 16px', marginBottom:16 }}>
                 <div style={{ fontSize:11, color:'#718096', marginBottom:4 }}>💰 Fiyat</div>
@@ -181,7 +177,6 @@ export default function Signals({ api }) {
                 </div>
               </div>
 
-              {/* Değişimler */}
               <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:16 }}>
                 {[
                   { label:'1 Dakika',  value: selected.change1 },
@@ -203,7 +198,6 @@ export default function Signals({ api }) {
                 })}
               </div>
 
-              {/* Volatilite & Hacim */}
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:16 }}>
                 <div style={{ background:'#060b14', border:'1px solid #1e2736',
                   borderRadius:8, padding:'12px 14px' }}>
@@ -223,7 +217,7 @@ export default function Signals({ api }) {
                 </div>
               </div>
 
-              {/* TradingView Grafik */}
+              {/* TradingView */}
               <div style={{ background:'#060b14', border:'1px solid #1e2736',
                 borderRadius:8, overflow:'hidden', height:400 }}>
                 <div style={{ fontSize:11, color:'#718096', padding:'8px 12px',
@@ -231,7 +225,7 @@ export default function Signals({ api }) {
                   📊 {selected.symbol} — TradingView
                 </div>
                 <iframe
-                  src={'https://www.tradingview.com/widgetembed/?frameElementId=tradingview&symbol=BINANCE:' + selected.symbol + '&interval=1&theme=dark&style=1&locale=tr&hide_top_toolbar=0&save_image=0'}
+                  src={'https://www.tradingview.com/widgetembed/?frameElementId=tv&symbol=BINANCE:' + selected.symbol + '&interval=1&theme=dark&style=1&locale=tr'}
                   style={{ width:'100%', height:'360px', border:'none' }}
                   title="TradingView"
                 />
