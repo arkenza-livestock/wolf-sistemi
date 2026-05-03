@@ -5,7 +5,7 @@ const db       = require('./src/database');
 const analyzer = require('./src/analyzer');
 
 const app  = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3006;
 
 app.use(cors());
 app.use(express.json());
@@ -28,11 +28,11 @@ app.get('/api/status', (req, res) => {
     const today   = db.prepare("SELECT COUNT(*) as c FROM signals WHERE date(created_at)=date('now')").get();
     const lastLog = db.prepare("SELECT * FROM scan_logs ORDER BY created_at DESC LIMIT 1").get();
     res.json({
-      running:    analyzer.running,
-      scanCount:  analyzer.scanCount,
-      lastScan:   analyzer.lastScan,
-      totalSignals: total.c,
-      todaySignals: today.c,
+      running:          analyzer.running,
+      scanCount:        analyzer.scanCount,
+      lastScan:         analyzer.lastScan,
+      totalSignals:     total.c,
+      todaySignals:     today.c,
       lastScanDuration: lastLog ? lastLog.duration_ms : 0,
     });
   } catch(e) { res.status(500).json({ error:e.message }); }
@@ -54,16 +54,15 @@ app.get('/api/signals', (req, res) => {
 
 app.get('/api/signals/latest', (req, res) => {
   try {
-    const signals = db.prepare("SELECT * FROM signals ORDER BY created_at DESC LIMIT 50").all();
-    res.json(signals);
+    res.json(db.prepare("SELECT * FROM signals ORDER BY created_at DESC LIMIT 50").all());
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
 app.get('/api/signals/stats', (req, res) => {
   try {
-    const byType = db.prepare("SELECT signal_type, COUNT(*) as count, AVG(confidence) as avg_conf FROM signals GROUP BY signal_type ORDER BY count DESC").all();
+    const byType   = db.prepare("SELECT signal_type, COUNT(*) as count, AVG(confidence) as avg_conf FROM signals GROUP BY signal_type ORDER BY count DESC").all();
     const bySymbol = db.prepare("SELECT symbol, COUNT(*) as count FROM signals GROUP BY symbol ORDER BY count DESC LIMIT 10").all();
-    const hourly = db.prepare("SELECT strftime('%H', created_at) as hour, COUNT(*) as count FROM signals WHERE date(created_at)=date('now') GROUP BY hour ORDER BY hour").all();
+    const hourly   = db.prepare("SELECT strftime('%H', created_at) as hour, COUNT(*) as count FROM signals WHERE date(created_at)=date('now') GROUP BY hour ORDER BY hour").all();
     res.json({ byType, bySymbol, hourly });
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
@@ -100,9 +99,9 @@ app.get('*', (req, res) => {
 });
 
 // ── SUNUCU ───────────────────────────────────────────────
-const http   = require('http');
+const http      = require('http');
 const WebSocket = require('ws');
-const server = http.createServer(app);
+const server    = http.createServer(app);
 
 global.wss = new WebSocket.Server({ server });
 global.wss.on('connection', function(ws) {
@@ -110,5 +109,5 @@ global.wss.on('connection', function(ws) {
 });
 
 server.listen(PORT, function() {
-  console.log('Wolf Sistemi: http://localhost:' + PORT);
+  console.log('🐺 Wolf Sistemi: http://localhost:' + PORT);
 });
