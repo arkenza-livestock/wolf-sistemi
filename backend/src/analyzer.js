@@ -15,42 +15,49 @@ class WolfAnalyzer {
     return Object.fromEntries(rows.map(function(r) { return [r.key, r.value]; }));
   }
 
-  async fetchTopCoins() {
+  async fetchTopCoins(count, minVolume) {
     try {
       const res = await axios.get('https://api.binance.com/api/v3/ticker/24hr', {
         headers: { 'User-Agent': 'Mozilla/5.0' },
         timeout: 10000
       });
 
-      const STABLES = ['BUSDUSDT','USDCUSDT','TUSDUSDT','USDTUSDT','FDUSDUSDT','DAIUSDT','USDPUSDT','EURUSDT','USTCUSDT'];
+      const STABLES = ['BUSDUSDT','USDCUSDT','TUSDUSDT','USDTUSDT','FDUSDUSDT',
+        'DAIUSDT','USDPUSDT','EURUSDT','USTCUSDT','USD1USDT'];
 
       const filtreli = res.data
         .filter(function(t) {
           if (!t.symbol.endsWith('USDT')) return false;
           if (STABLES.indexOf(t.symbol) >= 0) return false;
+          if (t.symbol.indexOf('币') >= 0) return false;
           const hacim = parseFloat(t.quoteVolume) || 0;
           const fiyat = parseFloat(t.lastPrice) || 0;
-          return fiyat > 0 && hacim > 10000000;
+          return fiyat > 0 && hacim >= minVolume;
         })
         .sort(function(a, b) {
           return parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume);
         })
-        .slice(0, 30)
+        .slice(0, count)
         .map(function(t) { return t.symbol; });
 
       this.coins = filtreli;
-      console.log('Top 30 coin guncellendi: ' + filtreli.join(', '));
+      console.log('Top ' + count + ' coin: ' + filtreli.slice(0,5).join(', ') + '...');
     } catch(e) {
       console.error('Top coin hatasi:', e.message);
-      // Fallback listesi
-      this.coins = [
-        'BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT',
-        'DOGEUSDT','ADAUSDT','AVAXUSDT','LINKUSDT','DOTUSDT',
-        'UNIUSDT','ATOMUSDT','NEARUSDT','APTUSDT','ARBUSDT',
-        'OPUSDT','INJUSDT','SUIUSDT','SHIBUSDT','PEPEUSDT',
-        'LTCUSDT','TRXUSDT','MATICUSDT','FETUSDT','WLDUSDT',
-        'AAVEUSDT','CRVUSDT','GRTUSDT','SEIUSDT','TIAUSDT'
-      ];
+      if (this.coins.length === 0) {
+        this.coins = [
+          'BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT',
+          'DOGEUSDT','ADAUSDT','AVAXUSDT','LINKUSDT','DOTUSDT',
+          'UNIUSDT','ATOMUSDT','NEARUSDT','APTUSDT','ARBUSDT',
+          'OPUSDT','INJUSDT','SUIUSDT','SHIBUSDT','PEPEUSDT',
+          'LTCUSDT','TRXUSDT','FETUSDT','WLDUSDT','AAVEUSDT',
+          'CRVUSDT','GRTUSDT','SEIUSDT','TIAUSDT','MATICUSDT',
+          'LDOUSDT','STXUSDT','RNDRUSDT','HBARUSDT','GALAUSDT',
+          'SANDUSDT','AXSUSDT','APEUSDT','MANAUSDT','GMXUSDT',
+          'KASUSDT','PYTHUSDT','JUPUSDT','PENGUUSDT','WIFUSDT',
+          'BONKUSDT','FLOKIUSDT','FTMUSDT','TRUUSDT','SUSHIUSDT'
+        ];
+      }
     }
   }
 
@@ -63,7 +70,7 @@ class WolfAnalyzer {
     return res.data;
   }
 
-  analyzeSignal(candles, symbol) {
+  analyzeSignal(candles, symbol, volSpikeRatio) {
     if (!candles || candles.length < 50) return null;
 
     const closes  = candles.map(function(c) { return parseFloat(c[4]); });
@@ -82,7 +89,7 @@ class WolfAnalyzer {
 
     const avgVol    = volumes.slice(-20).reduce(function(a,b) { return a+b; }, 0) / 20;
     const lastVol   = volumes[volumes.length - 1];
-    const volSpike  = lastVol > avgVol * 1.5;
+    const volSpike  = lastVol > avgVol * volSpikeRatio;
     const volatility = Math.abs(change5);
 
     var signal_type = 'NONE';
@@ -95,8 +102,8 @@ class WolfAnalyzer {
     else if (change1 < -1.8 && change5 < -1.5 && volSpike) { signal_type='STRONG_DUMP';  emoji='💥';   confidence=90; }
     else if (change1 > 1.0  && change5 > 0.8  && volSpike) { signal_type='PUMP';         emoji='📈';   confidence=75; }
     else if (change1 < -1.0 && change5 < -0.8 && volSpike) { signal_type='DUMP';         emoji='📉';   confidence=75; }
-    else if (change1 > 0.5  && volSpike)                    { signal_type='WEAK_PUMP';    emoji='🟢';   confidence=50; }
-    else if (change1 < -0.5 && volSpike)                    { signal_type='WEAK_DUMP';    emoji='🔴';   confidence=50; }
+    else if (change1 > 0.3  && volSpike)                    { signal_type='WEAK_PUMP';    emoji='🟢';   confidence=50; }
+    else if (change1 < -0.3 && volSpike)                    { signal_type='WEAK_DUMP';    emoji='🔴';   confidence=50; }
 
     if (signal_type === 'NONE') return null;
 
@@ -145,20 +152,20 @@ class WolfAnalyzer {
   }
 
   async scan() {
-    const baslangic = Date.now();
-    const settings  = this.getSettings();
+    const baslangic    = Date.now();
+    const settings     = this.getSettings();
+    const coinCount    = parseInt(settings.coin_count    || 50);
+    const minVolume    = parseFloat(settings.min_volume  || 10000000);
+    const volSpikeRatio = parseFloat(settings.vol_spike_ratio || 1.2);
     this.scanCount++;
 
-    console.log('WOLF TARAMA #' + this.scanCount + ' — ' + new Date().toLocaleTimeString('tr-TR'));
+    console.log('WOLF TARAMA #' + this.scanCount);
 
-    // Her 10 taramada bir coin listesini güncelle
+    // Her 10 taramada coin listesini güncelle
     if (this.scanCount === 1 || this.scanCount % 10 === 0) {
-      await this.fetchTopCoins();
+      await this.fetchTopCoins(coinCount, minVolume);
     }
-
-    if (this.coins.length === 0) {
-      await this.fetchTopCoins();
-    }
+    if (this.coins.length === 0) await this.fetchTopCoins(coinCount, minVolume);
 
     // Eski sinyalleri temizle
     db.prepare("DELETE FROM signals").run();
@@ -169,9 +176,15 @@ class WolfAnalyzer {
       var symbol = this.coins[i];
       try {
         var candles = await this.fetchCandles(symbol);
-        var result  = this.analyzeSignal(candles, symbol);
+        var result  = this.analyzeSignal(candles, symbol, volSpikeRatio);
 
         if (!result) {
+          await new Promise(function(r) { setTimeout(r, 80); });
+          continue;
+        }
+
+        const minConf = parseInt(settings.min_confidence || 50);
+        if (result.confidence < minConf) {
           await new Promise(function(r) { setTimeout(r, 80); });
           continue;
         }
@@ -210,7 +223,7 @@ class WolfAnalyzer {
   start() {
     if (this.running) return;
     this.running = true;
-    console.log('WOLF SISTEMI BASLADI — Top 30 dinamik coin');
+    console.log('WOLF SISTEMI BASLADI');
     var self = this;
     self.scan();
     this.interval = setInterval(function() { self.scan(); }, 60000);
