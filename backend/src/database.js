@@ -37,6 +37,9 @@ const defaults = {
   telegram_token:   '',
   telegram_chat_id: '',
   min_confidence:   '50',
+  min_volume:       '10000000',
+  coin_count:       '50',
+  vol_spike_ratio:  '1.2',
   scan_interval:    '1',
 };
 
