@@ -85,7 +85,12 @@ function TradingViewWidget({ symbol }) {
     <div
       className="tradingview-widget-container"
       ref={containerRef}
-      style={{ height:'500px', width:'100%', background:'#060b14' }}
+      style={{
+        height:    '600px',
+        minHeight: '600px',
+        width:     '100%',
+        background:'#060b14'
+      }}
     />
   );
 }
@@ -112,7 +117,6 @@ export default function Signals({ api }) {
       const data = await res.json();
       const list = Array.isArray(data) ? data : [];
       setSignals(list);
-      // Seçili coin korun — sadece ilk yüklemede veya coin silinince değiştir
       setSelected(function(prev) {
         if (prev) {
           const updated = list.find(function(s) { return s.symbol === prev.symbol; });
@@ -151,9 +155,10 @@ export default function Signals({ api }) {
         })}
       </div>
 
-      {/* Seçili coin */}
+      {/* Seçili coin — grafik üstte */}
       {selected && (
-        <div style={{ background:'#0a0e1a', border:'1px solid #1e2736', borderRadius:10, overflow:'hidden' }}>
+        <div style={{ background:'#0a0e1a', border:'1px solid #1e2736',
+          borderRadius:10, overflow:'hidden', width:'100%' }}>
 
           {/* Başlık */}
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
@@ -216,15 +221,16 @@ export default function Signals({ api }) {
             })}
           </div>
 
-          {/* TradingView */}
+          {/* TradingView Grafik — tam genişlik */}
           <TradingViewWidget symbol={selected.symbol} />
         </div>
       )}
 
       {/* Sinyal listesi */}
-      <div style={{ background:'#0a0e1a', border:'1px solid #1e2736', borderRadius:10, overflow:'hidden' }}>
-        <div style={{ padding:'10px 16px', borderBottom:'1px solid #1e2736', fontSize:12,
-          fontWeight:700, color:'#718096' }}>
+      <div style={{ background:'#0a0e1a', border:'1px solid #1e2736',
+        borderRadius:10, overflow:'hidden' }}>
+        <div style={{ padding:'10px 16px', borderBottom:'1px solid #1e2736',
+          fontSize:12, fontWeight:700, color:'#718096' }}>
           📋 Sinyal Listesi
         </div>
         {signals.length === 0 ? (
