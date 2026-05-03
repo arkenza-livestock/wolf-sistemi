@@ -154,8 +154,8 @@ class WolfAnalyzer {
   async scan() {
     const baslangic     = Date.now();
     const settings      = this.getSettings();
-    const coinCount     = parseInt(settings.coin_count     || 50);
-    const minVolume     = parseFloat(settings.min_volume   || 10000000);
+    const coinCount     = parseInt(settings.coin_count       || 50);
+    const minVolume     = parseFloat(settings.min_volume     || 10000000);
     const volSpikeRatio = parseFloat(settings.vol_spike_ratio || 1.2);
     this.scanCount++;
 
@@ -166,8 +166,8 @@ class WolfAnalyzer {
     }
     if (this.coins.length === 0) await this.fetchTopCoins(coinCount, minVolume);
 
-    // Eski sinyalleri temizle
-    db.prepare("DELETE FROM signals").run();
+    // 1 saatten eski sinyalleri sil
+    db.prepare("DELETE FROM signals WHERE created_at < datetime('now', '-1 hour')").run();
 
     var signalCount = 0;
 
@@ -212,7 +212,7 @@ class WolfAnalyzer {
     var sure = Date.now() - baslangic;
     this.lastScan = new Date().toISOString();
 
-    // Scan log kaydet — sadece son 20 tut
+    // Scan log — son 20 tut
     db.prepare('INSERT INTO scan_logs (coin_count,signal_count,duration_ms) VALUES (?,?,?)').run(
       this.coins.length, signalCount, sure
     );
