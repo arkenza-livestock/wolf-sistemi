@@ -1,143 +1,254 @@
 import React, { useState, useEffect } from 'react';
 
-export default function Settings({ api }) {
-  const [settings, setSettings] = useState({});
-  const [saving,   setSaving]   = useState(false);
-  const [saved,    setSaved]    = useState(false);
+const trSaat = function(t) { return t ? new Date(t).toLocaleString('tr-TR') : '-'; };
 
-  useEffect(function() { load(); }, [api]);
+const SIGNAL_COLORS = {
+  EXTREME_PUMP: '#f6ad55',
+  EXTREME_DUMP: '#fc8181',
+  STRONG_PUMP:  '#68d391',
+  STRONG_DUMP:  '#fc8181',
+  PUMP:         '#68d391',
+  DUMP:         '#fc8181',
+  WEAK_PUMP:    '#a0aec0',
+  WEAK_DUMP:    '#a0aec0',
+};
+
+const SIGNAL_BG = {
+  EXTREME_PUMP: 'rgba(246,173,85,0.1)',
+  EXTREME_DUMP: 'rgba(252,129,129,0.1)',
+  STRONG_PUMP:  'rgba(104,211,145,0.1)',
+  STRONG_DUMP:  'rgba(252,129,129,0.1)',
+  PUMP:         'rgba(104,211,145,0.05)',
+  DUMP:         'rgba(252,129,129,0.05)',
+  WEAK_PUMP:    'rgba(160,174,192,0.05)',
+  WEAK_DUMP:    'rgba(160,174,192,0.05)',
+};
+
+const FILTERS = [
+  { key:'ALL',          label:'Tümü' },
+  { key:'EXTREME_PUMP', label:'Extreme Pump' },
+  { key:'EXTREME_DUMP', label:'Extreme Dump' },
+  { key:'STRONG_PUMP',  label:'Strong Pump' },
+  { key:'STRONG_DUMP',  label:'Strong Dump' },
+  { key:'PUMP',         label:'Pump' },
+  { key:'DUMP',         label:'Dump' },
+  { key:'WEAK_PUMP',    label:'Weak Pump' },
+  { key:'WEAK_DUMP',    label:'Weak Dump' },
+];
+
+export default function Signals({ api }) {
+  const [signals,  setSignals]  = useState([]);
+  const [filter,   setFilter]   = useState('ALL');
+  const [selected, setSelected] = useState(null);
+  const [loading,  setLoading]  = useState(false);
+
+  useEffect(function() {
+    load();
+    const iv = setInterval(load, 15000);
+    return function() { clearInterval(iv); };
+  }, [api, filter]);
 
   async function load() {
+    setLoading(true);
     try {
-      const res  = await fetch(api + '/api/settings');
+      const url = filter === 'ALL'
+        ? api + '/api/signals?limit=200'
+        : api + '/api/signals?type=' + filter + '&limit=200';
+      const res  = await fetch(url);
       const data = await res.json();
-      setSettings(data);
+      const list = Array.isArray(data) ? data : [];
+      setSignals(list);
+      if (list.length > 0 && !selected) setSelected(list[0]);
     } catch(e) { console.error(e); }
+    setLoading(false);
   }
 
-  async function save() {
-    setSaving(true);
-    try {
-      await fetch(api + '/api/settings', {
-        method:  'POST',
-        headers: { 'Content-Type':'application/json' },
-        body:    JSON.stringify(settings)
-      });
-      setSaved(true);
-      setTimeout(function() { setSaved(false); }, 2000);
-    } catch(e) { alert('Hata: ' + e.message); }
-    setSaving(false);
-  }
-
-  function set(key, val) {
-    setSettings(function(prev) {
-      const next = Object.assign({}, prev);
-      next[key] = val;
-      return next;
-    });
-  }
-
-  const Input = function({ label, k, type, placeholder, desc }) {
-    type = type || 'text';
-    return (
-      <div style={{ marginBottom:16 }}>
-        <label style={{ display:'block', fontSize:12, color:'#718096', marginBottom:5, fontWeight:600 }}>
-          {label}
-        </label>
-        {desc && <div style={{ fontSize:11, color:'#4a5568', marginBottom:5 }}>{desc}</div>}
-        <input
-          className="form-input"
-          type={type}
-          placeholder={placeholder}
-          value={settings[k] || ''}
-          onChange={function(e) { set(k, e.target.value); }}
-        />
-      </div>
-    );
-  };
+  const tvUrl = selected
+    ? 'https://s.tradingview.com/widgetembed/?symbol=BINANCE:' + selected.symbol +
+      '&interval=1&theme=dark&style=1&locale=tr&hide_side_toolbar=0&allow_symbol_change=1&save_image=0&hideideas=1'
+    : '';
 
   return (
-    <div>
+    <div style={{ display:'flex', flexDirection:'column', height:'calc(100vh - 48px)', gap:16 }}>
+
       <div className="page-header">
         <div>
-          <div className="page-title">⚙️ Ayarlar</div>
-          <div className="page-sub">Wolf Sistemi konfigürasyonu</div>
+          <div className="page-title">🚨 Sinyaller</div>
+          <div className="page-sub">{signals.length} sinyal · Her 15 saniyede güncellenir</div>
         </div>
-        <button onClick={save} disabled={saving}
-          style={{ padding:'10px 28px', borderRadius:6, cursor:'pointer',
-            fontSize:14, fontWeight:600, border:'1px solid',
-            background: saved ? 'rgba(72,187,120,0.2)' : 'rgba(49,130,206,0.2)',
-            borderColor: saved ? '#48bb78' : '#3182ce',
-            color: saved ? '#68d391' : '#90cdf4' }}>
-          {saving ? '⏳ Kaydediliyor...' : saved ? '✅ Kaydedildi!' : '💾 Kaydet'}
-        </button>
+        <div style={{ fontSize:11, color:'#4a5568' }}>{loading ? '⏳' : ''}</div>
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'280px 1fr', gap:16, flex:1, minHeight:0 }}>
 
-        {/* Sol */}
-        <div>
-          <div className="card">
-            <div style={{ fontSize:12, color:'#f6ad55', fontWeight:700, marginBottom:16,
-              textTransform:'uppercase', letterSpacing:1 }}>📱 Telegram</div>
-            <Input label="Bot Token" k="telegram_token"
-              placeholder="123456789:ABC..."
-              desc="BotFather'dan alınan token" />
-            <Input label="Chat ID" k="telegram_chat_id"
-              placeholder="-1001234567890"
-              desc="Mesajın gönderileceği chat/kanal ID" />
-            <Input label="Min Güven Skoru (%)" k="min_confidence" type="number"
-              placeholder="50"
-              desc="Bu skorun altındaki sinyaller Telegram'a gönderilmez" />
-          </div>
-        </div>
+        {/* Sol — Liste */}
+        <div style={{ background:'#0a0e1a', border:'1px solid #1e2736', borderRadius:10,
+          display:'flex', flexDirection:'column', overflow:'hidden' }}>
 
-        {/* Sağ */}
-        <div>
-          <div className="card">
-            <div style={{ fontSize:12, color:'#f6ad55', fontWeight:700, marginBottom:16,
-              textTransform:'uppercase', letterSpacing:1 }}>📊 Sinyal Türleri</div>
-            <div style={{ fontSize:12, color:'#718096', lineHeight:2.2 }}>
-              {[
-                { emoji:'🚀🚀', name:'EXTREME_PUMP', desc:'1m >2.5% + 5m >2% + hacim' },
-                { emoji:'💥💥', name:'EXTREME_DUMP', desc:'1m <-2.5% + 5m <-2% + hacim' },
-                { emoji:'🚀',   name:'STRONG_PUMP',  desc:'1m >1.8% + 5m >1.5% + hacim' },
-                { emoji:'💥',   name:'STRONG_DUMP',  desc:'1m <-1.8% + 5m <-1.5% + hacim' },
-                { emoji:'📈',   name:'PUMP',         desc:'1m >1% + 5m >0.8% + hacim' },
-                { emoji:'📉',   name:'DUMP',         desc:'1m <-1% + 5m <-0.8% + hacim' },
-                { emoji:'🟢',   name:'WEAK_PUMP',    desc:'1m >0.5% + hacim' },
-                { emoji:'🔴',   name:'WEAK_DUMP',    desc:'1m <-0.5% + hacim' },
-              ].map(function(s, i) {
+          {/* Filtre */}
+          <div style={{ padding:'10px 12px', borderBottom:'1px solid #1e2736' }}>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+              {FILTERS.map(function(f) {
                 return (
-                  <div key={i} style={{ display:'flex', justifyContent:'space-between',
-                    padding:'4px 0', borderBottom:'1px solid #0d1117' }}>
-                    <span>{s.emoji} {s.name}</span>
-                    <span style={{ color:'#4a5568', fontSize:11 }}>{s.desc}</span>
-                  </div>
+                  <button key={f.key} onClick={function() { setFilter(f.key); }}
+                    style={{ padding:'4px 8px', borderRadius:4, cursor:'pointer',
+                      fontSize:10, fontWeight:600, border:'1px solid', whiteSpace:'nowrap',
+                      background: filter===f.key ? 'rgba(246,173,85,0.2)' : 'transparent',
+                      borderColor: filter===f.key ? '#f6ad55' : '#2d3748',
+                      color: filter===f.key ? '#f6ad55' : '#718096' }}>
+                    {f.label}
+                  </button>
                 );
               })}
             </div>
           </div>
 
-          <div className="card">
-            <div style={{ fontSize:12, color:'#f6ad55', fontWeight:700, marginBottom:16,
-              textTransform:'uppercase', letterSpacing:1 }}>🐺 Wolf Coins</div>
-            <div style={{ fontSize:12, color:'#718096', lineHeight:2 }}>
-              50 volatil coin izleniyor. Her 1 dakikada 1m/5m/15m/30m değişim ve hacim spike analizi yapılır.
-            </div>
+          {/* Liste */}
+          <div style={{ flex:1, overflowY:'auto' }}>
+            {signals.length === 0 ? (
+              <div style={{ textAlign:'center', padding:40, color:'#4a5568', fontSize:12 }}>
+                {loading ? 'Yükleniyor...' : 'Sinyal bulunamadı'}
+              </div>
+            ) : signals.map(function(s, i) {
+              const isSelected = selected && selected.id === s.id;
+              return (
+                <div key={i} onClick={function() { setSelected(s); }}
+                  style={{ padding:'10px 12px', cursor:'pointer',
+                    borderBottom:'1px solid #0d1117',
+                    background: isSelected ? (SIGNAL_BG[s.signal_type] || 'rgba(246,173,85,0.05)') : 'transparent',
+                    borderLeft: isSelected ? '3px solid #f6ad55' : '3px solid transparent',
+                    transition:'all 0.1s' }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                      <span style={{ fontSize:18 }}>{s.emoji}</span>
+                      <div>
+                        <div style={{ fontWeight:700, color:'#e2e8f0', fontSize:13 }}>{s.symbol}</div>
+                        <div style={{ fontSize:10, color:SIGNAL_COLORS[s.signal_type]||'#718096' }}>
+                          {s.signal_type}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign:'right' }}>
+                      <div style={{ fontWeight:800, fontSize:14, color:'#f6ad55' }}>{s.confidence}%</div>
+                      <div style={{ fontSize:9, color:'#4a5568' }}>{trSaat(s.created_at)}</div>
+                    </div>
+                  </div>
+                  <div style={{ display:'flex', gap:8, marginTop:4 }}>
+                    <span style={{ fontSize:10, color: parseFloat(s.change1||0) >= 0 ? '#68d391' : '#fc8181' }}>
+                      1m: {parseFloat(s.change1||0) >= 0 ? '+' : ''}{s.change1}%
+                    </span>
+                    <span style={{ fontSize:10, color: parseFloat(s.change5||0) >= 0 ? '#68d391' : '#fc8181' }}>
+                      5m: {parseFloat(s.change5||0) >= 0 ? '+' : ''}{s.change5}%
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
-      </div>
 
-      <div style={{ textAlign:'right', marginTop:8 }}>
-        <button onClick={save} disabled={saving}
-          style={{ padding:'12px 40px', borderRadius:6, cursor:'pointer',
-            fontSize:15, fontWeight:600, border:'1px solid',
-            background: saved ? 'rgba(72,187,120,0.2)' : 'rgba(49,130,206,0.2)',
-            borderColor: saved ? '#48bb78' : '#3182ce',
-            color: saved ? '#68d391' : '#90cdf4' }}>
-          {saving ? '⏳ Kaydediliyor...' : saved ? '✅ Kaydedildi!' : '💾 Kaydet'}
-        </button>
+        {/* Sağ — Detay */}
+        <div style={{ background:'#0a0e1a', border:'1px solid #1e2736', borderRadius:10,
+          overflowY:'auto', padding:'16px 20px' }}>
+          {selected ? (
+            <div>
+              {/* Başlık */}
+              <div style={{ display:'flex', justifyContent:'space-between',
+                alignItems:'center', marginBottom:20 }}>
+                <div>
+                  <div style={{ fontSize:26, fontWeight:800, color:'#e2e8f0' }}>
+                    {selected.emoji} {selected.symbol}
+                  </div>
+                  <div style={{ fontSize:12, color:'#718096', marginTop:4 }}>
+                    {trSaat(selected.created_at)}
+                  </div>
+                </div>
+                <div style={{ textAlign:'right' }}>
+                  <div style={{ fontSize:18, fontWeight:800,
+                    color: SIGNAL_COLORS[selected.signal_type]||'#e2e8f0' }}>
+                    {selected.signal_type}
+                  </div>
+                  <div style={{ fontSize:14, color:'#f6ad55', fontWeight:700 }}>
+                    {selected.confidence}% Güven
+                  </div>
+                </div>
+              </div>
+
+              {/* Fiyat */}
+              <div style={{ background:'#060b14', border:'1px solid #1e2736',
+                borderRadius:8, padding:'14px 16px', marginBottom:16 }}>
+                <div style={{ fontSize:11, color:'#718096', marginBottom:4 }}>💰 Fiyat</div>
+                <div style={{ fontSize:20, fontWeight:800, color:'#e2e8f0' }}>
+                  ${parseFloat(selected.price||0).toFixed(6)}
+                </div>
+              </div>
+
+              {/* Değişimler */}
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:16 }}>
+                {[
+                  { label:'1 Dakika',  value: selected.change1 },
+                  { label:'5 Dakika',  value: selected.change5 },
+                  { label:'15 Dakika', value: selected.change15 },
+                  { label:'30 Dakika', value: selected.change30 },
+                ].map(function(item, i) {
+                  const val = parseFloat(item.value || 0);
+                  return (
+                    <div key={i} style={{ background:'#060b14', border:'1px solid #1e2736',
+                      borderRadius:8, padding:'12px 14px', textAlign:'center' }}>
+                      <div style={{ fontSize:11, color:'#718096', marginBottom:6 }}>{item.label}</div>
+                      <div style={{ fontSize:18, fontWeight:800,
+                        color: val >= 0 ? '#68d391' : '#fc8181' }}>
+                        {val >= 0 ? '+' : ''}{val.toFixed(3)}%
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Volatilite & Hacim */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:16 }}>
+                <div style={{ background:'#060b14', border:'1px solid #1e2736',
+                  borderRadius:8, padding:'12px 14px' }}>
+                  <div style={{ fontSize:11, color:'#718096', marginBottom:4 }}>📈 Volatilite</div>
+                  <div style={{ fontSize:18, fontWeight:700, color:'#f6ad55' }}>
+                    {selected.volatility}%
+                  </div>
+                </div>
+                <div style={{
+                  background: selected.volume_spike ? '#0d2818' : '#060b14',
+                  border: '1px solid ' + (selected.volume_spike ? '#276749' : '#1e2736'),
+                  borderRadius:8, padding:'12px 14px' }}>
+                  <div style={{ fontSize:11, color:'#718096', marginBottom:4 }}>🔥 Hacim</div>
+                  <div style={{ fontSize:15, fontWeight:700,
+                    color: selected.volume_spike ? '#68d391' : '#a0aec0' }}>
+                    {selected.volume_spike ? 'HACİM PATLAMASI' : 'Normal'}
+                  </div>
+                </div>
+              </div>
+
+              {/* TradingView Grafik */}
+              <div style={{ background:'#060b14', border:'1px solid #1e2736',
+                borderRadius:8, overflow:'hidden', height:420 }}>
+                <div style={{ fontSize:11, color:'#718096', padding:'8px 12px',
+                  borderBottom:'1px solid #1e2736' }}>
+                  📊 {selected.symbol} — TradingView (1dk)
+                </div>
+                <iframe
+                  key={selected.symbol}
+                  src={tvUrl}
+                  style={{ width:'100%', height:'380px', border:'none' }}
+                  allowFullScreen={true}
+                  title={'TradingView ' + selected.symbol}
+                />
+              </div>
+            </div>
+          ) : (
+            <div style={{ textAlign:'center', padding:60, color:'#4a5568' }}>
+              <div style={{ fontSize:48, marginBottom:12 }}>👈</div>
+              <div>Sol taraftan bir sinyal seçin</div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
