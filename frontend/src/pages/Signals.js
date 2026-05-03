@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const trSaat = function(t) { return t ? new Date(t).toLocaleString('tr-TR') : '-'; };
 
@@ -36,6 +36,60 @@ const FILTERS = [
   { key:'WEAK_DUMP',    label:'Weak Dump' },
 ];
 
+function TradingViewWidget({ symbol }) {
+  const containerRef = useRef(null);
+
+  useEffect(function() {
+    if (!containerRef.current || !symbol) return;
+    containerRef.current.innerHTML = '';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'tradingview-widget-container__widget';
+    wrapper.style.height = '100%';
+    wrapper.style.width  = '100%';
+    containerRef.current.appendChild(wrapper);
+
+    const script = document.createElement('script');
+    script.src   = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+    script.type  = 'text/javascript';
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+      autosize:         true,
+      symbol:           'BINANCE:' + symbol,
+      interval:         '1',
+      timezone:         'Europe/Istanbul',
+      theme:            'dark',
+      style:            '1',
+      locale:           'tr',
+      hide_top_toolbar: false,
+      hide_legend:      false,
+      hide_volume:      false,
+      save_image:       false,
+      calendar:         false,
+      studies: [
+        'RSI@tv-basicstudies',
+        'MACD@tv-basicstudies',
+        'BB@tv-basicstudies',
+        'Volume@tv-basicstudies'
+      ]
+    });
+
+    containerRef.current.appendChild(script);
+
+    return function() {
+      if (containerRef.current) containerRef.current.innerHTML = '';
+    };
+  }, [symbol]);
+
+  return (
+    <div
+      className="tradingview-widget-container"
+      ref={containerRef}
+      style={{ height:'500px', width:'100%', background:'#060b14' }}
+    />
+  );
+}
+
 export default function Signals({ api }) {
   const [signals,  setSignals]  = useState([]);
   const [filter,   setFilter]   = useState('ALL');
@@ -58,16 +112,17 @@ export default function Signals({ api }) {
       const data = await res.json();
       const list = Array.isArray(data) ? data : [];
       setSignals(list);
-      if (list.length > 0 && !selected) setSelected(list[0]);
+      // Seçili coin korun — sadece ilk yüklemede veya coin silinince değiştir
+      setSelected(function(prev) {
+        if (prev) {
+          const updated = list.find(function(s) { return s.symbol === prev.symbol; });
+          return updated || prev;
+        }
+        return list[0] || null;
+      });
     } catch(e) { console.error(e); }
     setLoading(false);
   }
-
-  const tvSymbol = selected ? selected.symbol.replace('USDT', '') + 'USDT' : '';
-  const tvUrl = selected
-    ? 'https://s.tradingview.com/widgetembed/?symbol=BINANCE:' + tvSymbol +
-      '&interval=1&theme=dark&style=1&locale=tr&hide_side_toolbar=0&allow_symbol_change=1&save_image=0&hideideas=1'
-    : '';
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
@@ -96,10 +151,11 @@ export default function Signals({ api }) {
         })}
       </div>
 
-      {/* Ana içerik — üst grafik, alt liste+detay */}
+      {/* Seçili coin */}
       {selected && (
         <div style={{ background:'#0a0e1a', border:'1px solid #1e2736', borderRadius:10, overflow:'hidden' }}>
-          {/* Coin başlık */}
+
+          {/* Başlık */}
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
             padding:'12px 16px', borderBottom:'1px solid #1e2736' }}>
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
@@ -160,14 +216,8 @@ export default function Signals({ api }) {
             })}
           </div>
 
-          {/* TradingView Grafik — geniş */}
-          <iframe
-            key={selected.symbol}
-            src={tvUrl}
-            style={{ width:'100%', height:'500px', border:'none', display:'block' }}
-            allowFullScreen={true}
-            title={'TradingView ' + selected.symbol}
-          />
+          {/* TradingView */}
+          <TradingViewWidget symbol={selected.symbol} />
         </div>
       )}
 
@@ -198,11 +248,13 @@ export default function Signals({ api }) {
               </thead>
               <tbody>
                 {signals.map(function(s, i) {
-                  const isSelected = selected && selected.id === s.id;
+                  const isSelected = selected && selected.symbol === s.symbol;
                   return (
                     <tr key={i} onClick={function() { setSelected(s); }}
                       style={{ cursor:'pointer', borderBottom:'1px solid #0d1117',
-                        background: isSelected ? (SIGNAL_BG[s.signal_type]||'rgba(246,173,85,0.05)') : 'transparent' }}>
+                        background: isSelected
+                          ? (SIGNAL_BG[s.signal_type]||'rgba(246,173,85,0.05)')
+                          : 'transparent' }}>
                       <td style={{ padding:'8px 12px' }}>
                         <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                           <span>{s.emoji}</span>
@@ -218,16 +270,16 @@ export default function Signals({ api }) {
                       <td style={{ padding:'8px 12px', fontWeight:800, color:'#f6ad55' }}>
                         {s.confidence}%
                       </td>
-                      <td style={{ padding:'8px 12px', fontSize:12,
-                        color: parseFloat(s.change1||0) >= 0 ? '#68d391' : '#fc8181', fontWeight:600 }}>
+                      <td style={{ padding:'8px 12px', fontSize:12, fontWeight:600,
+                        color: parseFloat(s.change1||0) >= 0 ? '#68d391' : '#fc8181' }}>
                         {parseFloat(s.change1||0) >= 0 ? '+' : ''}{s.change1}%
                       </td>
-                      <td style={{ padding:'8px 12px', fontSize:12,
-                        color: parseFloat(s.change5||0) >= 0 ? '#68d391' : '#fc8181', fontWeight:600 }}>
+                      <td style={{ padding:'8px 12px', fontSize:12, fontWeight:600,
+                        color: parseFloat(s.change5||0) >= 0 ? '#68d391' : '#fc8181' }}>
                         {parseFloat(s.change5||0) >= 0 ? '+' : ''}{s.change5}%
                       </td>
-                      <td style={{ padding:'8px 12px', fontSize:12,
-                        color: parseFloat(s.change15||0) >= 0 ? '#68d391' : '#fc8181', fontWeight:600 }}>
+                      <td style={{ padding:'8px 12px', fontSize:12, fontWeight:600,
+                        color: parseFloat(s.change15||0) >= 0 ? '#68d391' : '#fc8181' }}>
                         {parseFloat(s.change15||0) >= 0 ? '+' : ''}{s.change15}%
                       </td>
                       <td style={{ padding:'8px 12px', fontSize:12, color:'#f6ad55' }}>
