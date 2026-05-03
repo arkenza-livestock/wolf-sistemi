@@ -12,17 +12,17 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '../frontend/build')));
 
 // ── ANALYZER ─────────────────────────────────────────────
-app.post('/api/analyzer/start', async (req, res) => {
+app.post('/api/analyzer/start', async function(req, res) {
   try { analyzer.start(); res.json({ success:true }); }
   catch(e) { res.status(500).json({ error:e.message }); }
 });
 
-app.post('/api/analyzer/stop', (req, res) => {
+app.post('/api/analyzer/stop', function(req, res) {
   try { analyzer.stop(); res.json({ success:true }); }
   catch(e) { res.status(500).json({ error:e.message }); }
 });
 
-app.get('/api/status', (req, res) => {
+app.get('/api/status', function(req, res) {
   try {
     const total   = db.prepare("SELECT COUNT(*) as c FROM signals").get();
     const today   = db.prepare("SELECT COUNT(*) as c FROM signals WHERE date(created_at)=date('now')").get();
@@ -39,26 +39,32 @@ app.get('/api/status', (req, res) => {
 });
 
 // ── SİNYALLER ────────────────────────────────────────────
-app.get('/api/signals', (req, res) => {
+app.get('/api/signals', function(req, res) {
   try {
     const limit  = parseInt(req.query.limit) || 100;
     const type   = req.query.type || '';
-    let query    = "SELECT * FROM signals";
-    const params = [];
-    if (type) { query += " WHERE signal_type=?"; params.push(type); }
-    query += " ORDER BY created_at DESC LIMIT ?";
-    params.push(limit);
+    var query, params;
+
+    if (type) {
+      query  = "SELECT * FROM signals WHERE id IN (SELECT MAX(id) FROM signals WHERE signal_type=? GROUP BY symbol) ORDER BY created_at DESC LIMIT ?";
+      params = [type, limit];
+    } else {
+      query  = "SELECT * FROM signals WHERE id IN (SELECT MAX(id) FROM signals GROUP BY symbol) ORDER BY created_at DESC LIMIT ?";
+      params = [limit];
+    }
+
     res.json(db.prepare(query).all(...params));
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
-app.get('/api/signals/latest', (req, res) => {
+app.get('/api/signals/latest', function(req, res) {
   try {
-    res.json(db.prepare("SELECT * FROM signals ORDER BY created_at DESC LIMIT 50").all());
+    const signals = db.prepare("SELECT * FROM signals WHERE id IN (SELECT MAX(id) FROM signals GROUP BY symbol) ORDER BY created_at DESC LIMIT 50").all();
+    res.json(signals);
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
-app.get('/api/signals/stats', (req, res) => {
+app.get('/api/signals/stats', function(req, res) {
   try {
     const byType   = db.prepare("SELECT signal_type, COUNT(*) as count, AVG(confidence) as avg_conf FROM signals GROUP BY signal_type ORDER BY count DESC").all();
     const bySymbol = db.prepare("SELECT symbol, COUNT(*) as count FROM signals GROUP BY symbol ORDER BY count DESC LIMIT 10").all();
@@ -68,21 +74,21 @@ app.get('/api/signals/stats', (req, res) => {
 });
 
 // ── SCAN LOGS ────────────────────────────────────────────
-app.get('/api/scan-logs', (req, res) => {
+app.get('/api/scan-logs', function(req, res) {
   try {
     res.json(db.prepare("SELECT * FROM scan_logs ORDER BY created_at DESC LIMIT 20").all());
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
 // ── AYARLAR ──────────────────────────────────────────────
-app.get('/api/settings', (req, res) => {
+app.get('/api/settings', function(req, res) {
   try {
     const rows = db.prepare('SELECT key, value FROM settings').all();
-    res.json(Object.fromEntries(rows.map(r => [r.key, r.value])));
+    res.json(Object.fromEntries(rows.map(function(r) { return [r.key, r.value]; })));
   } catch(e) { res.status(500).json({ error:e.message }); }
 });
 
-app.post('/api/settings', (req, res) => {
+app.post('/api/settings', function(req, res) {
   try {
     for (const [key, value] of Object.entries(req.body)) {
       const ex = db.prepare('SELECT key FROM settings WHERE key=?').get(key);
@@ -94,7 +100,7 @@ app.post('/api/settings', (req, res) => {
 });
 
 // ── FRONTEND ─────────────────────────────────────────────
-app.get('*', (req, res) => {
+app.get('*', function(req, res) {
   res.sendFile(path.join(__dirname, '../frontend/build/index.html'));
 });
 
@@ -109,5 +115,5 @@ global.wss.on('connection', function(ws) {
 });
 
 server.listen(PORT, function() {
-  console.log('🐺 Wolf Sistemi: http://localhost:' + PORT);
+  console.log('Wolf Sistemi: http://localhost:' + PORT);
 });
