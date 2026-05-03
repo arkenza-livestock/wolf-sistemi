@@ -1,30 +1,57 @@
 const axios = require('axios');
 const db    = require('./database');
 
-const WOLF_COINS = [
-  'BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT',
-  'DOGEUSDT','ADAUSDT','AVAXUSDT','LINKUSDT','DOTUSDT',
-  'UNIUSDT','ATOMUSDT','NEARUSDT','APTUSDT','ARBUSDT',
-  'OPUSDT','INJUSDT','SUIUSDT','SHIBUSDT','PEPEUSDT',
-  'FLOKIUSDT','BONKUSDT','WIFUSDT','FTMUSDT','GMXUSDT',
-  'KASUSDT','PYTHUSDT','JUPUSDT','PENGUUSDT','MANAUSDT',
-  'SANDUSDT','AXSUSDT','GALAUSDT','GRTUSDT','APEUSDT',
-  'FETUSDT','WLDUSDT','SEIUSDT','TIAUSDT','CRVUSDT',
-  'AAVEUSDT','SUSHIUSDT','LTCUSDT','TRXUSDT','MATICUSDT',
-  'LDOUSDT','STXUSDT','RNDRUSDT','TRUUSDT','HBARUSDT'
-];
-
 class WolfAnalyzer {
   constructor() {
     this.running   = false;
     this.interval  = null;
     this.scanCount = 0;
     this.lastScan  = null;
+    this.coins     = [];
   }
 
   getSettings() {
     const rows = db.prepare('SELECT key, value FROM settings').all();
     return Object.fromEntries(rows.map(function(r) { return [r.key, r.value]; }));
+  }
+
+  async fetchTopCoins() {
+    try {
+      const res = await axios.get('https://api.binance.com/api/v3/ticker/24hr', {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        timeout: 10000
+      });
+
+      const STABLES = ['BUSDUSDT','USDCUSDT','TUSDUSDT','USDTUSDT','FDUSDUSDT','DAIUSDT','USDPUSDT','EURUSDT','USTCUSDT'];
+
+      const filtreli = res.data
+        .filter(function(t) {
+          if (!t.symbol.endsWith('USDT')) return false;
+          if (STABLES.indexOf(t.symbol) >= 0) return false;
+          const hacim = parseFloat(t.quoteVolume) || 0;
+          const fiyat = parseFloat(t.lastPrice) || 0;
+          return fiyat > 0 && hacim > 10000000;
+        })
+        .sort(function(a, b) {
+          return parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume);
+        })
+        .slice(0, 30)
+        .map(function(t) { return t.symbol; });
+
+      this.coins = filtreli;
+      console.log('Top 30 coin guncellendi: ' + filtreli.join(', '));
+    } catch(e) {
+      console.error('Top coin hatasi:', e.message);
+      // Fallback listesi
+      this.coins = [
+        'BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT',
+        'DOGEUSDT','ADAUSDT','AVAXUSDT','LINKUSDT','DOTUSDT',
+        'UNIUSDT','ATOMUSDT','NEARUSDT','APTUSDT','ARBUSDT',
+        'OPUSDT','INJUSDT','SUIUSDT','SHIBUSDT','PEPEUSDT',
+        'LTCUSDT','TRXUSDT','MATICUSDT','FETUSDT','WLDUSDT',
+        'AAVEUSDT','CRVUSDT','GRTUSDT','SEIUSDT','TIAUSDT'
+      ];
+    }
   }
 
   async fetchCandles(symbol) {
@@ -124,12 +151,22 @@ class WolfAnalyzer {
 
     console.log('WOLF TARAMA #' + this.scanCount + ' — ' + new Date().toLocaleTimeString('tr-TR'));
 
-    db.prepare("DELETE FROM signals WHERE id NOT IN (SELECT id FROM signals ORDER BY id DESC LIMIT 500)").run();
+    // Her 10 taramada bir coin listesini güncelle
+    if (this.scanCount === 1 || this.scanCount % 10 === 0) {
+      await this.fetchTopCoins();
+    }
+
+    if (this.coins.length === 0) {
+      await this.fetchTopCoins();
+    }
+
+    // Eski sinyalleri temizle
+    db.prepare("DELETE FROM signals").run();
 
     var signalCount = 0;
 
-    for (var i = 0; i < WOLF_COINS.length; i++) {
-      var symbol = WOLF_COINS[i];
+    for (var i = 0; i < this.coins.length; i++) {
+      var symbol = this.coins[i];
       try {
         var candles = await this.fetchCandles(symbol);
         var result  = this.analyzeSignal(candles, symbol);
@@ -164,7 +201,7 @@ class WolfAnalyzer {
     this.lastScan = new Date().toISOString();
 
     db.prepare('INSERT INTO scan_logs (coin_count,signal_count,duration_ms) VALUES (?,?,?)').run(
-      WOLF_COINS.length, signalCount, sure
+      this.coins.length, signalCount, sure
     );
 
     console.log('Tarama bitti (' + (sure/1000).toFixed(1) + 's) — ' + signalCount + ' sinyal');
@@ -173,7 +210,7 @@ class WolfAnalyzer {
   start() {
     if (this.running) return;
     this.running = true;
-    console.log('WOLF SISTEMI BASLADI');
+    console.log('WOLF SISTEMI BASLADI — Top 30 dinamik coin');
     var self = this;
     self.scan();
     this.interval = setInterval(function() { self.scan(); }, 60000);
