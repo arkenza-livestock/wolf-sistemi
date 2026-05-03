@@ -1,297 +1,203 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 
-const trSaat = function(t) { return t ? new Date(t).toLocaleString('tr-TR') : '-'; };
+export default function Settings({ api }) {
+  const [settings, setSettings] = useState({});
+  const [saving,   setSaving]   = useState(false);
+  const [saved,    setSaved]    = useState(false);
 
-const SIGNAL_COLORS = {
-  EXTREME_PUMP: '#f6ad55',
-  EXTREME_DUMP: '#fc8181',
-  STRONG_PUMP:  '#68d391',
-  STRONG_DUMP:  '#fc8181',
-  PUMP:         '#68d391',
-  DUMP:         '#fc8181',
-  WEAK_PUMP:    '#a0aec0',
-  WEAK_DUMP:    '#a0aec0',
-};
-
-const SIGNAL_BG = {
-  EXTREME_PUMP: 'rgba(246,173,85,0.1)',
-  EXTREME_DUMP: 'rgba(252,129,129,0.1)',
-  STRONG_PUMP:  'rgba(104,211,145,0.1)',
-  STRONG_DUMP:  'rgba(252,129,129,0.1)',
-  PUMP:         'rgba(104,211,145,0.05)',
-  DUMP:         'rgba(252,129,129,0.05)',
-  WEAK_PUMP:    'rgba(160,174,192,0.05)',
-  WEAK_DUMP:    'rgba(160,174,192,0.05)',
-};
-
-const FILTERS = [
-  { key:'ALL',          label:'Tümü' },
-  { key:'EXTREME_PUMP', label:'Extreme Pump' },
-  { key:'EXTREME_DUMP', label:'Extreme Dump' },
-  { key:'STRONG_PUMP',  label:'Strong Pump' },
-  { key:'STRONG_DUMP',  label:'Strong Dump' },
-  { key:'PUMP',         label:'Pump' },
-  { key:'DUMP',         label:'Dump' },
-  { key:'WEAK_PUMP',    label:'Weak Pump' },
-  { key:'WEAK_DUMP',    label:'Weak Dump' },
-];
-
-function TradingViewWidget({ symbol }) {
-  const containerRef = useRef(null);
-
-  useEffect(function() {
-    if (!containerRef.current || !symbol) return;
-    containerRef.current.innerHTML = '';
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'tradingview-widget-container__widget';
-    wrapper.style.height = '100%';
-    wrapper.style.width  = '100%';
-    containerRef.current.appendChild(wrapper);
-
-    const script = document.createElement('script');
-    script.src   = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-    script.type  = 'text/javascript';
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-      autosize:         true,
-      symbol:           'BINANCE:' + symbol,
-      interval:         '1',
-      timezone:         'Europe/Istanbul',
-      theme:            'dark',
-      style:            '1',
-      locale:           'tr',
-      hide_top_toolbar: false,
-      hide_legend:      false,
-      hide_volume:      false,
-      save_image:       false,
-      calendar:         false,
-      studies: [
-        'RSI@tv-basicstudies',
-        'MACD@tv-basicstudies',
-        'BB@tv-basicstudies',
-        'Volume@tv-basicstudies'
-      ]
-    });
-
-    containerRef.current.appendChild(script);
-
-    return function() {
-      if (containerRef.current) containerRef.current.innerHTML = '';
-    };
-  }, [symbol]);
-
-  return (
-    <div
-      className="tradingview-widget-container"
-      ref={containerRef}
-      style={{ height:'500px', width:'100%', background:'#060b14' }}
-    />
-  );
-}
-
-export default function Signals({ api }) {
-  const [signals,  setSignals]  = useState([]);
-  const [filter,   setFilter]   = useState('ALL');
-  const [selected, setSelected] = useState(null);
-  const [loading,  setLoading]  = useState(false);
-
-  useEffect(function() {
-    load();
-    const iv = setInterval(load, 15000);
-    return function() { clearInterval(iv); };
-  }, [api, filter]);
+  useEffect(function() { load(); }, [api]);
 
   async function load() {
-    setLoading(true);
     try {
-      const url = filter === 'ALL'
-        ? api + '/api/signals?limit=200'
-        : api + '/api/signals?type=' + filter + '&limit=200';
-      const res  = await fetch(url);
+      const res  = await fetch(api + '/api/settings');
       const data = await res.json();
-      const list = Array.isArray(data) ? data : [];
-      setSignals(list);
-      if (list.length > 0 && !selected) setSelected(list[0]);
+      setSettings(data);
     } catch(e) { console.error(e); }
-    setLoading(false);
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      await fetch(api + '/api/settings', {
+        method:  'POST',
+        headers: { 'Content-Type':'application/json' },
+        body:    JSON.stringify(settings)
+      });
+      setSaved(true);
+      setTimeout(function() { setSaved(false); }, 2000);
+    } catch(e) { alert('Hata: ' + e.message); }
+    setSaving(false);
+  }
+
+  function set(key, val) {
+    setSettings(function(prev) {
+      const next = Object.assign({}, prev);
+      next[key] = val;
+      return next;
+    });
   }
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-
+    <div>
       <div className="page-header">
         <div>
-          <div className="page-title">🚨 Sinyaller</div>
-          <div className="page-sub">{signals.length} sinyal · Her 15 saniyede güncellenir</div>
+          <div className="page-title">⚙️ Ayarlar</div>
+          <div className="page-sub">Wolf Sistemi konfigürasyonu</div>
         </div>
-        <div style={{ fontSize:11, color:'#4a5568' }}>{loading ? '⏳' : ''}</div>
+        <button onClick={save} disabled={saving}
+          style={{ padding:'10px 28px', borderRadius:6, cursor:'pointer',
+            fontSize:14, fontWeight:600, border:'1px solid',
+            background: saved ? 'rgba(72,187,120,0.2)' : 'rgba(49,130,206,0.2)',
+            borderColor: saved ? '#48bb78' : '#3182ce',
+            color: saved ? '#68d391' : '#90cdf4' }}>
+          {saving ? '⏳ Kaydediliyor...' : saved ? '✅ Kaydedildi!' : '💾 Kaydet'}
+        </button>
       </div>
 
-      {/* Filtre */}
-      <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
-        {FILTERS.map(function(f) {
-          return (
-            <button key={f.key} onClick={function() { setFilter(f.key); }}
-              style={{ padding:'5px 10px', borderRadius:4, cursor:'pointer',
-                fontSize:11, fontWeight:600, border:'1px solid', whiteSpace:'nowrap',
-                background: filter===f.key ? 'rgba(246,173,85,0.2)' : 'transparent',
-                borderColor: filter===f.key ? '#f6ad55' : '#2d3748',
-                color: filter===f.key ? '#f6ad55' : '#718096' }}>
-              {f.label}
-            </button>
-          );
-        })}
-      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
 
-      {/* Seçili coin */}
-      {selected && (
-        <div style={{ background:'#0a0e1a', border:'1px solid #1e2736', borderRadius:10, overflow:'hidden' }}>
+        {/* Sol */}
+        <div>
+          <div className="card" style={{ marginBottom:16 }}>
+            <div style={{ fontSize:12, color:'#f6ad55', fontWeight:700, marginBottom:16,
+              textTransform:'uppercase', letterSpacing:1 }}>📱 Telegram</div>
 
-          {/* Başlık */}
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center',
-            padding:'12px 16px', borderBottom:'1px solid #1e2736' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-              <span style={{ fontSize:22 }}>{selected.emoji}</span>
-              <div>
-                <span style={{ fontSize:18, fontWeight:800, color:'#e2e8f0' }}>{selected.symbol}</span>
-                <span style={{ marginLeft:10, fontSize:13,
-                  color: SIGNAL_COLORS[selected.signal_type]||'#718096', fontWeight:700 }}>
-                  {selected.signal_type}
-                </span>
-              </div>
+            <div style={{ marginBottom:14 }}>
+              <label style={{ display:'block', fontSize:12, color:'#718096',
+                marginBottom:4, fontWeight:600 }}>Bot Token</label>
+              <div style={{ fontSize:11, color:'#4a5568', marginBottom:5 }}>
+                BotFather'dan alınan token</div>
+              <input className="form-input" type="text"
+                placeholder="123456789:ABC..."
+                value={settings.telegram_token || ''}
+                onChange={function(e) { set('telegram_token', e.target.value); }} />
             </div>
-            <div style={{ display:'flex', gap:20, alignItems:'center' }}>
-              <div style={{ textAlign:'center' }}>
-                <div style={{ fontSize:11, color:'#718096' }}>Fiyat</div>
-                <div style={{ fontSize:15, fontWeight:700, color:'#e2e8f0' }}>
-                  ${parseFloat(selected.price||0).toFixed(6)}
-                </div>
-              </div>
-              <div style={{ textAlign:'center' }}>
-                <div style={{ fontSize:11, color:'#718096' }}>Güven</div>
-                <div style={{ fontSize:15, fontWeight:800, color:'#f6ad55' }}>{selected.confidence}%</div>
-              </div>
-              <div style={{ textAlign:'center' }}>
-                <div style={{ fontSize:11, color:'#718096' }}>Volatilite</div>
-                <div style={{ fontSize:15, fontWeight:700, color:'#f6ad55' }}>{selected.volatility}%</div>
-              </div>
-              <div style={{ textAlign:'center' }}>
-                <div style={{ fontSize:11, color:'#718096' }}>Hacim</div>
-                <div style={{ fontSize:13, fontWeight:700,
-                  color: selected.volume_spike ? '#68d391' : '#a0aec0' }}>
-                  {selected.volume_spike ? '🔥 PATLAMA' : 'Normal'}
-                </div>
-              </div>
+
+            <div style={{ marginBottom:14 }}>
+              <label style={{ display:'block', fontSize:12, color:'#718096',
+                marginBottom:4, fontWeight:600 }}>Chat ID</label>
+              <div style={{ fontSize:11, color:'#4a5568', marginBottom:5 }}>
+                Mesajın gönderileceği chat/kanal ID</div>
+              <input className="form-input" type="text"
+                placeholder="-1001234567890"
+                value={settings.telegram_chat_id || ''}
+                onChange={function(e) { set('telegram_chat_id', e.target.value); }} />
+            </div>
+
+            <div style={{ marginBottom:14 }}>
+              <label style={{ display:'block', fontSize:12, color:'#718096',
+                marginBottom:4, fontWeight:600 }}>Min Güven Skoru (%)</label>
+              <div style={{ fontSize:11, color:'#4a5568', marginBottom:5 }}>
+                Bu skorun altındaki sinyaller Telegram'a gönderilmez</div>
+              <input className="form-input" type="number"
+                placeholder="50"
+                value={settings.min_confidence || ''}
+                onChange={function(e) { set('min_confidence', e.target.value); }} />
             </div>
           </div>
 
-          {/* Değişimler */}
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)',
-            borderBottom:'1px solid #1e2736' }}>
-            {[
-              { label:'1 Dakika',  value: selected.change1 },
-              { label:'5 Dakika',  value: selected.change5 },
-              { label:'15 Dakika', value: selected.change15 },
-              { label:'30 Dakika', value: selected.change30 },
-            ].map(function(item, i) {
-              const val = parseFloat(item.value || 0);
-              return (
-                <div key={i} style={{ padding:'10px 16px', textAlign:'center',
-                  borderRight: i < 3 ? '1px solid #1e2736' : 'none' }}>
-                  <div style={{ fontSize:11, color:'#718096', marginBottom:4 }}>{item.label}</div>
-                  <div style={{ fontSize:16, fontWeight:800,
-                    color: val >= 0 ? '#68d391' : '#fc8181' }}>
-                    {val >= 0 ? '+' : ''}{val.toFixed(3)}%
+          <div className="card">
+            <div style={{ fontSize:12, color:'#f6ad55', fontWeight:700, marginBottom:16,
+              textTransform:'uppercase', letterSpacing:1 }}>🔍 Tarama Ayarları</div>
+
+            <div style={{ marginBottom:14 }}>
+              <label style={{ display:'block', fontSize:12, color:'#718096',
+                marginBottom:4, fontWeight:600 }}>Coin Sayısı</label>
+              <div style={{ fontSize:11, color:'#4a5568', marginBottom:5 }}>
+                Taranacak en iyi coin sayısı (önerilen: 50)</div>
+              <input className="form-input" type="number"
+                placeholder="50"
+                value={settings.coin_count || ''}
+                onChange={function(e) { set('coin_count', e.target.value); }} />
+            </div>
+
+            <div style={{ marginBottom:14 }}>
+              <label style={{ display:'block', fontSize:12, color:'#718096',
+                marginBottom:4, fontWeight:600 }}>Min Hacim (USDT)</label>
+              <div style={{ fontSize:11, color:'#4a5568', marginBottom:5 }}>
+                24s minimum hacim (önerilen: 10000000)</div>
+              <input className="form-input" type="number"
+                placeholder="10000000"
+                value={settings.min_volume || ''}
+                onChange={function(e) { set('min_volume', e.target.value); }} />
+            </div>
+
+            <div style={{ marginBottom:14 }}>
+              <label style={{ display:'block', fontSize:12, color:'#718096',
+                marginBottom:4, fontWeight:600 }}>Hacim Spike Oranı</label>
+              <div style={{ fontSize:11, color:'#4a5568', marginBottom:5 }}>
+                Ortalamaya kıyasla hacim artışı (önerilen: 1.2)</div>
+              <input className="form-input" type="number" step="0.1"
+                placeholder="1.2"
+                value={settings.vol_spike_ratio || ''}
+                onChange={function(e) { set('vol_spike_ratio', e.target.value); }} />
+            </div>
+          </div>
+        </div>
+
+        {/* Sağ */}
+        <div>
+          <div className="card" style={{ marginBottom:16 }}>
+            <div style={{ fontSize:12, color:'#f6ad55', fontWeight:700, marginBottom:16,
+              textTransform:'uppercase', letterSpacing:1 }}>📊 Sinyal Türleri</div>
+            <div style={{ fontSize:12, color:'#718096' }}>
+              {[
+                { emoji:'🚀🚀', name:'EXTREME_PUMP', desc:'1m >2.5% + 5m >2% + hacim' },
+                { emoji:'💥💥', name:'EXTREME_DUMP', desc:'1m <-2.5% + 5m <-2% + hacim' },
+                { emoji:'🚀',   name:'STRONG_PUMP',  desc:'1m >1.8% + 5m >1.5% + hacim' },
+                { emoji:'💥',   name:'STRONG_DUMP',  desc:'1m <-1.8% + 5m <-1.5% + hacim' },
+                { emoji:'📈',   name:'PUMP',         desc:'1m >1% + 5m >0.8% + hacim' },
+                { emoji:'📉',   name:'DUMP',         desc:'1m <-1% + 5m <-0.8% + hacim' },
+                { emoji:'🟢',   name:'WEAK_PUMP',    desc:'1m >0.3% + hacim spike' },
+                { emoji:'🔴',   name:'WEAK_DUMP',    desc:'1m <-0.3% + hacim spike' },
+              ].map(function(s, i) {
+                return (
+                  <div key={i} style={{ display:'flex', justifyContent:'space-between',
+                    alignItems:'center', padding:'7px 0', borderBottom:'1px solid #0d1117' }}>
+                    <span style={{ fontWeight:600 }}>{s.emoji} {s.name}</span>
+                    <span style={{ color:'#4a5568', fontSize:11 }}>{s.desc}</span>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
-          {/* TradingView */}
-          <TradingViewWidget symbol={selected.symbol} />
+          <div className="card">
+            <div style={{ fontSize:12, color:'#f6ad55', fontWeight:700, marginBottom:12,
+              textTransform:'uppercase', letterSpacing:1 }}>ℹ️ Bilgi</div>
+            <div style={{ fontSize:12, color:'#718096', lineHeight:1.8 }}>
+              <div style={{ marginBottom:8 }}>
+                🐺 <b style={{ color:'#e2e8f0' }}>Wolf Sistemi</b> her 1 dakikada
+                Binance'deki en yüksek hacimli coinleri tarar.
+              </div>
+              <div style={{ marginBottom:8 }}>
+                📊 <b style={{ color:'#e2e8f0' }}>1m/5m/15m/30m</b> değişim analizi yapılır.
+              </div>
+              <div style={{ marginBottom:8 }}>
+                🔥 <b style={{ color:'#e2e8f0' }}>Hacim Spike</b> tespiti ile
+                gerçek hareketler yakalanır.
+              </div>
+              <div style={{ marginBottom:8 }}>
+                ⏰ Sinyaller <b style={{ color:'#e2e8f0' }}>1 saat</b> sonra otomatik silinir.
+              </div>
+              <div>
+                🔄 Coin listesi <b style={{ color:'#e2e8f0' }}>her 10 taramada</b>
+                otomatik güncellenir.
+              </div>
+            </div>
+          </div>
         </div>
-      )}
+      </div>
 
-      {/* Sinyal listesi */}
-      <div style={{ background:'#0a0e1a', border:'1px solid #1e2736', borderRadius:10, overflow:'hidden' }}>
-        <div style={{ padding:'10px 16px', borderBottom:'1px solid #1e2736', fontSize:12,
-          fontWeight:700, color:'#718096' }}>
-          📋 Sinyal Listesi
-        </div>
-        {signals.length === 0 ? (
-          <div style={{ textAlign:'center', padding:40, color:'#4a5568', fontSize:12 }}>
-            {loading ? 'Yükleniyor...' : 'Sinyal bulunamadı — Analyzer başlatın'}
-          </div>
-        ) : (
-          <div style={{ overflowX:'auto' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom:'1px solid #1e2736' }}>
-                  {['Coin','Sinyal','Güven','1m','5m','15m','Volatilite','Hacim','Zaman'].map(function(h) {
-                    return (
-                      <th key={h} style={{ padding:'8px 12px', fontSize:11, color:'#718096',
-                        textAlign:'left', fontWeight:600 }}>
-                        {h}
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {signals.map(function(s, i) {
-                  const isSelected = selected && selected.id === s.id;
-                  return (
-                    <tr key={i} onClick={function() { setSelected(s); }}
-                      style={{ cursor:'pointer', borderBottom:'1px solid #0d1117',
-                        background: isSelected
-                          ? (SIGNAL_BG[s.signal_type]||'rgba(246,173,85,0.05)')
-                          : 'transparent' }}>
-                      <td style={{ padding:'8px 12px' }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                          <span>{s.emoji}</span>
-                          <span style={{ fontWeight:700, color:'#e2e8f0', fontSize:13 }}>{s.symbol}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding:'8px 12px' }}>
-                        <span style={{ fontSize:11, fontWeight:700,
-                          color: SIGNAL_COLORS[s.signal_type]||'#718096' }}>
-                          {s.signal_type}
-                        </span>
-                      </td>
-                      <td style={{ padding:'8px 12px', fontWeight:800, color:'#f6ad55' }}>
-                        {s.confidence}%
-                      </td>
-                      <td style={{ padding:'8px 12px', fontSize:12, fontWeight:600,
-                        color: parseFloat(s.change1||0) >= 0 ? '#68d391' : '#fc8181' }}>
-                        {parseFloat(s.change1||0) >= 0 ? '+' : ''}{s.change1}%
-                      </td>
-                      <td style={{ padding:'8px 12px', fontSize:12, fontWeight:600,
-                        color: parseFloat(s.change5||0) >= 0 ? '#68d391' : '#fc8181' }}>
-                        {parseFloat(s.change5||0) >= 0 ? '+' : ''}{s.change5}%
-                      </td>
-                      <td style={{ padding:'8px 12px', fontSize:12, fontWeight:600,
-                        color: parseFloat(s.change15||0) >= 0 ? '#68d391' : '#fc8181' }}>
-                        {parseFloat(s.change15||0) >= 0 ? '+' : ''}{s.change15}%
-                      </td>
-                      <td style={{ padding:'8px 12px', fontSize:12, color:'#f6ad55' }}>
-                        {s.volatility}%
-                      </td>
-                      <td style={{ padding:'8px 12px', fontSize:12,
-                        color: s.volume_spike ? '#68d391' : '#a0aec0' }}>
-                        {s.volume_spike ? '🔥 Patlama' : 'Normal'}
-                      </td>
-                      <td style={{ padding:'8px 12px', fontSize:11, color:'#4a5568' }}>
-                        {trSaat(s.created_at)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div style={{ textAlign:'right', marginTop:16 }}>
+        <button onClick={save} disabled={saving}
+          style={{ padding:'12px 40px', borderRadius:6, cursor:'pointer',
+            fontSize:15, fontWeight:600, border:'1px solid',
+            background: saved ? 'rgba(72,187,120,0.2)' : 'rgba(49,130,206,0.2)',
+            borderColor: saved ? '#48bb78' : '#3182ce',
+            color: saved ? '#68d391' : '#90cdf4' }}>
+          {saving ? '⏳ Kaydediliyor...' : saved ? '✅ Kaydedildi!' : '💾 Kaydet'}
+        </button>
       </div>
     </div>
   );
