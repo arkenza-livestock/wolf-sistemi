@@ -87,9 +87,9 @@ class WolfAnalyzer {
     const change15 = ((curr - prev15) / prev15) * 100;
     const change30 = ((curr - prev30) / prev30) * 100;
 
-    const avgVol    = volumes.slice(-20).reduce(function(a,b) { return a+b; }, 0) / 20;
-    const lastVol   = volumes[volumes.length - 1];
-    const volSpike  = lastVol > avgVol * volSpikeRatio;
+    const avgVol     = volumes.slice(-20).reduce(function(a,b) { return a+b; }, 0) / 20;
+    const lastVol    = volumes[volumes.length - 1];
+    const volSpike   = lastVol > avgVol * volSpikeRatio;
     const volatility = Math.abs(change5);
 
     var signal_type = 'NONE';
@@ -152,16 +152,15 @@ class WolfAnalyzer {
   }
 
   async scan() {
-    const baslangic    = Date.now();
-    const settings     = this.getSettings();
-    const coinCount    = parseInt(settings.coin_count    || 50);
-    const minVolume    = parseFloat(settings.min_volume  || 10000000);
+    const baslangic     = Date.now();
+    const settings      = this.getSettings();
+    const coinCount     = parseInt(settings.coin_count     || 50);
+    const minVolume     = parseFloat(settings.min_volume   || 10000000);
     const volSpikeRatio = parseFloat(settings.vol_spike_ratio || 1.2);
     this.scanCount++;
 
     console.log('WOLF TARAMA #' + this.scanCount);
 
-    // Her 10 taramada coin listesini güncelle
     if (this.scanCount === 1 || this.scanCount % 10 === 0) {
       await this.fetchTopCoins(coinCount, minVolume);
     }
@@ -213,9 +212,11 @@ class WolfAnalyzer {
     var sure = Date.now() - baslangic;
     this.lastScan = new Date().toISOString();
 
+    // Scan log kaydet — sadece son 20 tut
     db.prepare('INSERT INTO scan_logs (coin_count,signal_count,duration_ms) VALUES (?,?,?)').run(
       this.coins.length, signalCount, sure
     );
+    db.prepare("DELETE FROM scan_logs WHERE id NOT IN (SELECT id FROM scan_logs ORDER BY id DESC LIMIT 20)").run();
 
     console.log('Tarama bitti (' + (sure/1000).toFixed(1) + 's) — ' + signalCount + ' sinyal');
   }
