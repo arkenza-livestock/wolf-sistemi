@@ -157,6 +157,7 @@ class WolfAnalyzer {
     const coinCount     = parseInt(settings.coin_count       || 50);
     const minVolume     = parseFloat(settings.min_volume     || 10000000);
     const volSpikeRatio = parseFloat(settings.vol_spike_ratio || 1.2);
+    const minConf       = parseInt(settings.min_confidence   || 50);
     this.scanCount++;
 
     console.log('WOLF TARAMA #' + this.scanCount);
@@ -182,8 +183,17 @@ class WolfAnalyzer {
           continue;
         }
 
-        const minConf = parseInt(settings.min_confidence || 50);
         if (result.confidence < minConf) {
+          await new Promise(function(r) { setTimeout(r, 80); });
+          continue;
+        }
+
+        // Son 1 saatte aynı coin + aynı sinyal türü varsa atla
+        const existing = db.prepare(
+          "SELECT id FROM signals WHERE symbol=? AND signal_type=? AND created_at > datetime('now', '-1 hour')"
+        ).get(result.symbol, result.signal_type);
+
+        if (existing) {
           await new Promise(function(r) { setTimeout(r, 80); });
           continue;
         }
@@ -212,7 +222,6 @@ class WolfAnalyzer {
     var sure = Date.now() - baslangic;
     this.lastScan = new Date().toISOString();
 
-    // Scan log — son 20 tut
     db.prepare('INSERT INTO scan_logs (coin_count,signal_count,duration_ms) VALUES (?,?,?)').run(
       this.coins.length, signalCount, sure
     );
