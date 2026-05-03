@@ -11,7 +11,7 @@ RUN cd frontend && npm install
 COPY backend/ ./backend/
 COPY frontend/ ./frontend/
 
-RUN cd frontend && npm run build
+RUN cd frontend && GENERATE_SOURCEMAP=false npm run build
 
 RUN mkdir -p /app/data
 
